@@ -317,7 +317,7 @@ choose_install_version() {
             ;;
         3)
             # Получаем ссылку на последнюю pre-release сборку для ветки (предпочитаем .apk/.ipk по платформе)
-            DOWNLOAD_URL=$(curl -s https://api.github.com/repos/ang3el7z/luci-app-singbox-ui/releases | \
+            DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases | \
             awk -v branch="$BRANCH" -v ext="$PKG_EXT" '
                 /"prerelease": true/ { prerelease=1 }
                 /"target_commitish":/ {
@@ -336,7 +336,7 @@ choose_install_version() {
 
             if [ -z "$DOWNLOAD_URL" ]; then
                 # fallback: ищем любой pre-release по расширению / any prerelease by extension
-                DOWNLOAD_URL=$(curl -s https://api.github.com/repos/ang3el7z/luci-app-singbox-ui/releases | \
+                DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases | \
                 grep -A 20 '"prerelease": true' | \
                 grep "browser_download_url.*luci-app-singbox-ui\.${PKG_EXT}" | \
                 head -n 1 | \
