@@ -22,7 +22,7 @@ Web interface for managing Sing-Box on OpenWrt 23/24/25.
 
 ## Installation
 ```bash
-wget -O /root/install.sh https://raw.githubusercontent.com/ang3el7z/luci-app-singbox-ui/main/install.sh && chmod 0755 /root/install.sh && BRANCH="main" sh /root/install.sh
+wget -O /root/install.sh https://raw.githubusercontent.com/Pavlo1c/luci-app-singbox-ui/main/install.sh && chmod 0755 /root/install.sh && BRANCH="main" sh /root/install.sh
 ```
 
 After running the script:
@@ -50,8 +50,8 @@ ssh root@192.168.1.1
 If the LuCI page is not visible after install, do a hard refresh in the browser.
 
 ## Config Templates
-- [openwrt-template](https://raw.githubusercontent.com/ang3el7z/luci-app-singbox-ui/main/other/file/openwrt-template.json)
-- [openwrt-template-tproxy](https://raw.githubusercontent.com/ang3el7z/luci-app-singbox-ui/main/other/file/openwrt-template-tproxy.json)
+- [openwrt-template](https://raw.githubusercontent.com/Pavlo1c/luci-app-singbox-ui/main/other/file/openwrt-template.json)
+- [openwrt-template-tproxy](https://raw.githubusercontent.com/Pavlo1c/luci-app-singbox-ui/main/other/file/openwrt-template-tproxy.json)
 - [Sing-Box Configuration](https://sing-box.sagernet.org/configuration/)
 
 ## Contributing
