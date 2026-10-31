@@ -2,7 +2,8 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-singbox-ui
 PKG_VERSION:=2.4.0
-PKG_RELEASE:=1
+# Keep the package version identical to PKG_VERSION in opkg/apk metadata.
+PKG_RELEASE:=
 
 LUCI_TITLE:=LuCI singbox-ui app
 LUCI_DEPENDS:=+luci-base +sing-box +curl +jq +openssl-util
