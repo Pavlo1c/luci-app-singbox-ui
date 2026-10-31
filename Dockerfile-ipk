@@ -1,5 +1,5 @@
-FROM itdoginfo/openwrt-sdk-ipk:24.10.3
+FROM itdoginfo/openwrt-sdk-ipk:24.10.6
 
 COPY ./luci-app-singbox-ui /builder/package/feeds/luci/luci-app-singbox-ui
 
-RUN make defconfig && make package/luci-app-singbox-ui/compile  V=s -j4
+RUN make defconfig && make package/luci-app-singbox-ui/compile V=s -j4
