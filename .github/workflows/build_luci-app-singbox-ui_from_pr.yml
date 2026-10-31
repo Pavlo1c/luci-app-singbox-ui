@@ -3,6 +3,7 @@ run-name: Build artifact PR ${{ github.event.pull_request.number }}
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
 
