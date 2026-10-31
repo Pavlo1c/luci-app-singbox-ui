@@ -1,11 +1,7 @@
-# Trigger CI from a user-authored commit
 name: Build luci-app-singbox-ui from PR
-run-name: Build artifact PR ${{ github.event.pull_request.number || github.ref_name }}
+run-name: Build artifact PR #${{ github.event.pull_request.number }}
 
 on:
-  push:
-    branches:
-      - chatgpt/ci-openwrt-ipk-apk-release
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
