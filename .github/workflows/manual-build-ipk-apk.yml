@@ -43,7 +43,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ./sdk-output ./artifacts
+          rm -rf ./sdk-output ./package-out
+          mkdir -p ./sdk-output ./package-out
           docker cp singbox-ui-${{ matrix.pkg_type }}:/builder/bin/packages/x86_64/luci/. ./sdk-output/
           shopt -s nullglob
           packages=(./sdk-output/luci-app-singbox-ui*.${{ matrix.pkg_type }})
@@ -52,7 +53,7 @@ jobs:
             find ./sdk-output -maxdepth 2 -type f -print
             exit 1
           fi
-          cp "${packages[0]}" ./artifacts/
+          cp "${packages[0]}" ./package-out/
 
       - name: Remove build container
         if: always()
@@ -62,6 +63,6 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
           name: luci-app-singbox-ui-${{ matrix.pkg_type }}
-          path: artifacts/*
+          path: package-out/
           if-no-files-found: error
           retention-days: 7
