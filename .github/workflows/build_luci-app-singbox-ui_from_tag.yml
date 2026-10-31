@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [[ "${TAG_VERSION}" == "${GITHUB_REF_NAME}" ]] || ! [[ "${TAG_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+          if [[ "${TAG_VERSION}" == "${GITHUB_REF_NAME}" ]] || ! [[ "${TAG_VERSION}" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Expected a version tag such as v2.3.11; got ${GITHUB_REF_NAME}" >&2
             exit 1
           fi
@@ -59,8 +59,7 @@ jobs:
             ls -la ./sdk-output/
             exit 1
           fi
-          PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
-          cp "${packages[0]}" "./pkg-out/luci-app-singbox-ui-${PACKAGE_VERSION}.${{ matrix.pkg_type }}"
+          cp "${packages[0]}" "./pkg-out/luci-app-singbox-ui.${{ matrix.pkg_type }}"
 
       - name: Remove Docker container
         if: always()
