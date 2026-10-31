@@ -2,6 +2,7 @@
     "luci-app-singbox-ui": {
         "description": "Singbox-UI management access",
         "read": {
+            "session": ["access"],
             "file": {
                 "/etc/init.d/sing-box": ["exec"],
                 "/etc/init.d/singbox-ui-autoupdater-service": ["exec"],
@@ -29,7 +30,9 @@
             "file": {
                 "/etc/sing-box/*": ["write"],
                 "/sbin/uci": ["exec"],
-                "/tmp/*": ["write", "exec"]
+                "/tmp/*": ["write", "exec"],
+                "/bin/sh": ["exec"],
+                "/usr/bin/openssl": ["exec"]
             },
             "uci": ["singbox-ui"]
         }
