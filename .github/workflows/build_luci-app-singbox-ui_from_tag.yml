@@ -59,7 +59,8 @@ jobs:
             ls -la ./sdk-output/
             exit 1
           fi
-          cp "${packages[0]}" ./pkg-out/
+          PACKAGE_VERSION="${GITHUB_REF_NAME#v}"
+          cp "${packages[0]}" "./pkg-out/luci-app-singbox-ui-${PACKAGE_VERSION}.${{ matrix.pkg_type }}"
 
       - name: Remove Docker container
         if: always()

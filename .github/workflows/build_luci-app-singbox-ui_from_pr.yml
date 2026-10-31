@@ -48,7 +48,8 @@ jobs:
             ls -la ./sdk-output/
             exit 1
           fi
-          cp "${packages[0]}" ./artifacts/
+          PACKAGE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' luci-app-singbox-ui/Makefile)"
+          cp "${packages[0]}" "./artifacts/luci-app-singbox-ui-${PACKAGE_VERSION}.${{ matrix.pkg_type }}"
 
       - name: Remove Docker container
         if: always()
