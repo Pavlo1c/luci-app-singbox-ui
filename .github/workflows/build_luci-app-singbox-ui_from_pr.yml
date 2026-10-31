@@ -1,7 +1,10 @@
 name: Build luci-app-singbox-ui from PR
-run-name: Build artifact PR ${{ github.event.pull_request.number }}
+run-name: Build artifact PR ${{ github.event.pull_request.number || github.ref_name }}
 
 on:
+  push:
+    branches:
+      - chatgpt/ci-openwrt-ipk-apk-release
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
@@ -23,7 +26,6 @@ jobs:
       - name: Checkout pull request
         uses: actions/checkout@v5.0.0
         with:
-          # Checkout the tested merge commit; no writes are performed by this workflow.
           fetch-depth: 1
 
       - name: Build Docker image (${{ matrix.pkg_type }})
