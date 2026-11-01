@@ -22,16 +22,21 @@ jobs:
       - name: Checkout develop source
         uses: actions/checkout@v5.0.0
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Set development package version
         shell: bash
         run: |
           set -euo pipefail
-          BASE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' luci-app-singbox-ui/Makefile)"
-          DEV_VERSION="${BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          LATEST_TAG="$(git tag --list 'v[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          if [[ -z "$LATEST_TAG" ]]; then
+            echo "No stable version tag found" >&2
+            exit 1
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "${LATEST_TAG#v}"
+          NEXT_PATCH=$((PATCH + 1))
+          DEV_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-dev.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
           sed -i "s/^PKG_VERSION:=.*$/PKG_VERSION:=${DEV_VERSION}/" luci-app-singbox-ui/Makefile
-          echo "PACKAGE_VERSION=${DEV_VERSION}" >> "$GITHUB_ENV"
           grep '^PKG_VERSION:=' luci-app-singbox-ui/Makefile
 
       - name: Build Docker image (${{ matrix.pkg_type }})
@@ -51,7 +56,7 @@ jobs:
           mkdir -p ./sdk-output ./pkg-out
           docker cp singbox-ui-${{ matrix.pkg_type }}:/builder/bin/packages/x86_64/luci/. ./sdk-output/
           shopt -s nullglob
-          packages=(./sdk-output/luci-app-singbox-ui*.\${{ matrix.pkg_type }})
+          packages=(./sdk-output/luci-app-singbox-ui*.${{ matrix.pkg_type }})
           if [ "${#packages[@]}" -ne 1 ]; then
             echo "Expected exactly one luci-app-singbox-ui .${{ matrix.pkg_type }} package; found ${#packages[@]}" >&2
             ls -la ./sdk-output/
@@ -93,9 +98,9 @@ jobs:
       - name: Create GitHub pre-release
         uses: softprops/action-gh-release@v2.4.0
         with:
-          tag_name: v${{ github.event.repository }}-dev.${{ github.run_number }}.${{ github.run_attempt }}
+          tag_name: develop-${{ github.run_number }}-${{ github.run_attempt }}
           target_commitish: develop
-          name: singbox-ui develop ${{ github.run_number }}.${{ github.run_attempt }}
+          name: singbox-ui develop build ${{ github.run_number }}.${{ github.run_attempt }}
           files: |
             release/*.ipk
             release/*.apk
