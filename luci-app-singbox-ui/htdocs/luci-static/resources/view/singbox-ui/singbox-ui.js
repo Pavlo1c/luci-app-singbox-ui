@@ -510,25 +510,43 @@ function colorizeLog(raw) {
 async function getVersions() {
 	let singboxUi = '\u2014';
 	let singbox   = '\u2014';
+
 	try {
 		const { stdout } = await fs.exec(SINGBOX_BIN, ['version']);
-		const m = stdout?.match(/(\d+\.\d+\.\d+(?:-\S+)?)/);
+		const m = stdout?.match(/(\\d+\\.\\d+\\.\\d+(?:-\\S+)?)/);
 		if (m) singbox = m[1];
 	} catch (_) {}
-	try {
-		const { stdout } = await fs.exec('/bin/opkg', ['list-installed', 'luci-app-singbox-ui']);
-		const m = stdout?.match(/luci-app-singbox-ui[^\d]*([\d.]+(?:-\d+)?)/);
-		if (m) singboxUi = m[1];
-	} catch (_) {
+
+	// Try the package manager used by this OpenWrt release first. A successful
+	// command with empty/unmatched output must not prevent the fallback attempt.
+	const readPackageVersion = async (manager) => {
 		try {
-			const { stdout } = await fs.exec('/usr/bin/apk', ['info', '-e', 'luci-app-singbox-ui']);
-			const m = stdout?.match(/luci-app-singbox-ui-([\d.]+(?:-r\d+)?)/);
-			if (m) singboxUi = m[1];
-		} catch (_) {}
-	}
+			if (manager === 'apk') {
+				const { stdout } = await fs.exec('apk', ['list', '--installed', '-q', 'luci-app-singbox-ui']);
+				const m = stdout?.match(/(?:^|\\n)luci-app-singbox-ui-([0-9][0-9A-Za-z.+~-]*)(?:\\s|$)/);
+				return m ? m[1] : null;
+			}
+
+			const { stdout } = await fs.exec('opkg', ['list-installed', 'luci-app-singbox-ui']);
+			const m = stdout?.match(/(?:^|\\n)luci-app-singbox-ui\\s+-\\s+([^\\s]+)/);
+			return m ? m[1] : null;
+		} catch (_) {
+			return null;
+		}
+	};
+
+	let preferredManager = 'opkg';
+	try {
+		const { stdout } = await fs.exec('/bin/sh', ['-c', '. /etc/openwrt_release 2>/dev/null; printf "%s" "$DISTRIB_RELEASE"']);
+		if (/^(?:25\\.12|2[6-9]\\.)/.test(stdout || '')) preferredManager = 'apk';
+	} catch (_) {}
+
+	singboxUi = await readPackageVersion(preferredManager)
+		|| await readPackageVersion(preferredManager === 'apk' ? 'opkg' : 'apk')
+		|| singboxUi;
+
 	return { singboxUi, singbox };
 }
-
 // ============================================================
 // Ace editor
 // ============================================================
