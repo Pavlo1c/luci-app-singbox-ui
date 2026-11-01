@@ -310,13 +310,14 @@ choose_install_version() {
                     [
                         .[]
                         | select(.prerelease == true and .target_commitish == "develop")
-                        | select(.tag_name | test("^develop-[0-9]+-[0-9]+$"))
+                        | (.tag_name | split("-")) as $parts
+                        | select(($parts | length) == 3 and $parts[0] == "develop")
                         | {
-                            run:   (.tag_name | capture("^develop-(?<run>[0-9]+)-(?<attempt>[0-9]+)$") | .run | tonumber),
-                            attempt: (.tag_name | capture("^develop-(?<run>[0-9]+)-(?<attempt>[0-9]+)$") | .attempt | tonumber),
+                            run: ($parts[1] | tonumber?),
+                            attempt: ($parts[2] | tonumber?),
                             url: ([.assets[] | select(.name == $asset) | .browser_download_url][0] // empty)
                         }
-                        | select(.url != "")
+                        | select(.run != null and .attempt != null and .url != "")
                     ]
                     | sort_by(.run, .attempt)
                     | last
