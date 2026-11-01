@@ -1446,7 +1446,6 @@ function initPage(page, state, mainContent, mainUrl) {
 	if (dashBtn) dashBtn.onclick = async () => {
 		const host = window.location.hostname;
 		const findPorts = [
-			'set -f',
 			'pids="$(pidof sing-box 2>/dev/null)"',
 			'[ -n "$pids" ] || exit 1',
 			'inodes=""',
