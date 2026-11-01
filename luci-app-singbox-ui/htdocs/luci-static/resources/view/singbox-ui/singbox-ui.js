@@ -1310,7 +1310,17 @@ function initPage(page, state, mainContent, mainUrl) {
 		search() {
 			const ed = window.singboxEditor;
 			if (!ed) return notify('error', _('Editor not ready'));
-			ed.execCommand('find');
+			try {
+				const searchbox = ace.require('ace/ext/searchbox');
+				if (searchbox?.Search) {
+					searchbox.Search(ed);
+				} else {
+					ed.execCommand('find');
+				}
+			} catch (e) {
+				console.error('[singbox-ui] Ace search error:', e);
+				notify('error', _('Search panel could not be opened'));
+			}
 		},
 
 		format(b) {
