@@ -1504,18 +1504,20 @@ function initPage(page, state, mainContent, mainUrl) {
 					const candidate = `${protocol}://${host}:${port}/ui/`;
 					report(_('Checking ') + candidate);
 					try {
-						const result = await fs.exec('/bin/uclient-fetch', [
-							'--no-check-certificate', '--timeout=2', '-O', '/dev/null', candidate,
+						const result = await fs.exec('/usr/bin/curl', [
+							'-k', '-sS', '-o', '/dev/null', '-w', '%{http_code}',
+							'--connect-timeout', '2', '--max-time', '3', candidate,
 						]);
+						const status = String(result?.stdout || '').trim();
 						console.info('[Dashboard discovery] probe:', candidate, {
-							code: result?.code, stdout: result?.stdout, stderr: result?.stderr,
+							code: result?.code, httpStatus: status, stderr: result?.stderr,
 						});
-						if (result?.code === 0) {
+						if (result?.code === 0 && status === '200') {
 							url = candidate;
-							report(_('Dashboard found: ') + url);
+							report(_('Dashboard found (HTTP 200): ') + url);
 							break;
 						}
-						report(candidate + _(' — no response (exit ') + String(result?.code ?? 'unknown') + ')');
+						report(candidate + _(' — HTTP status: ') + (status || _('connection failed')));
 					} catch (e) {
 						console.warn('[Dashboard discovery] probe error:', candidate, e);
 						report(candidate + _(' — connection error: ') + e.message);
