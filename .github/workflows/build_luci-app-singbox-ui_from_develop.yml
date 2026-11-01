@@ -1,5 +1,5 @@
 name: Build luci-app-singbox-ui from develop
-run-name: Build develop pre-release ${{ github.run_number }}.${{ github.run_attempt }}
+run-name: Build singbox-ui 2.4.2 pre-release ${{ github.run_number }}.${{ github.run_attempt }}
 
 on:
   push:
@@ -93,7 +93,7 @@ jobs:
         with:
           tag_name: develop-${{ github.run_number }}-${{ github.run_attempt }}
           target_commitish: develop
-          name: singbox-ui develop build ${{ github.run_number }}.${{ github.run_attempt }}
+          name: singbox-ui 2.4.2 (develop build ${{ github.run_number }}.${{ github.run_attempt }})
           files: |
             release/*.ipk
             release/*.apk
