@@ -564,6 +564,7 @@ function loadScript(src) {
 async function initAceEditor(el, content) {
 	await loadScript(ACE_BASE + 'ace.js');
 	await loadScript(ACE_BASE + 'ext-language_tools.js');
+	await loadScript(ACE_BASE + 'ext-searchbox.js');
 	ace.config.set('basePath',   ACE_BASE);
 	ace.config.set('workerPath', ACE_BASE);
 	const ed = ace.edit(el);
@@ -991,6 +992,7 @@ function buildPageHtml(state) {
     <div class="sbox-actions">
       ${cbtn('apply',    'format',   _('Format'))}
       ${cbtn('positive', 'save',     _('Save'))}
+      <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
       <button type="button" class="cbi-button cbi-button-apply"
         data-config-action="setAsMain" id="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
       ${cbtn('negative', 'clear', _('Clear All'))}
@@ -1306,6 +1308,12 @@ function initPage(page, state, mainContent, mainUrl) {
 					notify('error', _('Update failed: ') + e.message);
 				}
 			});
+		},
+
+		search() {
+			const ed = window.singboxEditor;
+			if (!ed) return notify('error', _('Editor not ready'));
+			ed.execCommand('find');
 		},
 
 		format(b) {
