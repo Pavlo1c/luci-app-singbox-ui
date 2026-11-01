@@ -1445,9 +1445,14 @@ function initPage(page, state, mainContent, mainUrl) {
 	const dashBtn = page.querySelector('#sbox-header-dash');
 	if (dashBtn) dashBtn.onclick = async () => {
 		const host = window.location.hostname;
+		const report = message => {
+			console.info('[Dashboard discovery]', message);
+			notify('info', message);
+		};
 		const findPorts = [
 			'pids="$(pidof sing-box 2>/dev/null)"',
-			'[ -n "$pids" ] || exit 1',
+			'[ -n "$pids" ] || { echo "sing-box process not found" >&2; exit 1; }',
+			'echo "PIDs: $pids" >&2',
 			'inodes=""',
 			'for pid in $pids; do',
 			'  for fd in /proc/"$pid"/fd/*; do',
@@ -1457,7 +1462,7 @@ function initPage(page, state, mainContent, mainUrl) {
 			'    esac',
 			'  done',
 		'done',
-		'[ -n "$inodes" ] || exit 1',
+		'[ -n "$inodes" ] || { echo "No sockets found for sing-box" >&2; exit 2; }',
 		'awk -v sockets="$inodes" \'',
 		'  function hexdec(s, i, n, c) {',
 		'    n=0; s=toupper(s);',
@@ -1475,20 +1480,46 @@ function initPage(page, state, mainContent, mainUrl) {
 
 		dashBtn.disabled = true;
 		try {
+			report(_('Dashboard: searching for sing-box process…'));
 			const scan = await fs.exec('/bin/sh', ['-c', findPorts]);
-			const ports = String(scan?.stdout || '').trim().split(/\s+/).filter(p => /^\d+$/.test(p));
+			const output = String(scan?.stdout || '').trim();
+			const errors = String(scan?.stderr || '').trim();
+			const ports = output.split(/\s+/).filter(p => /^\d+$/.test(p));
+			console.info('[Dashboard discovery] socket scan:', { code: scan?.code, stdout: output, stderr: errors });
+
+			if (scan?.code !== 0 && !ports.length) {
+				notify('error', _('Dashboard scan failed: ') + (errors || _('no listening sockets found')));
+				return;
+			}
+			if (!ports.length) {
+				notify('error', _('sing-box is running, but no TCP listening ports were detected'));
+				return;
+			}
+
+			report(_('Dashboard: found listening ports: ') + ports.join(', '));
 			let url = null;
 
-			// Probe HTTP on every sing-box listening port first, then HTTPS.
 			for (const protocol of ['http', 'https']) {
 				for (const port of ports) {
 					const candidate = `${protocol}://${host}:${port}/ui/`;
+					report(_('Checking ') + candidate);
 					try {
 						const result = await fs.exec('/bin/uclient-fetch', [
-							'-q', '--no-check-certificate', '--timeout=3', '-O', '/dev/null', candidate,
+							'--no-check-certificate', '--timeout=2', '-O', '/dev/null', candidate,
 						]);
-						if (result?.code === 0) { url = candidate; break; }
-					} catch (_) {}
+						console.info('[Dashboard discovery] probe:', candidate, {
+							code: result?.code, stdout: result?.stdout, stderr: result?.stderr,
+						});
+						if (result?.code === 0) {
+							url = candidate;
+							report(_('Dashboard found: ') + url);
+							break;
+						}
+						report(candidate + _(' — no response (exit ') + String(result?.code ?? 'unknown') + ')');
+					} catch (e) {
+						console.warn('[Dashboard discovery] probe error:', candidate, e);
+						report(candidate + _(' — connection error: ') + e.message);
+					}
 				}
 				if (url) break;
 			}
@@ -1496,13 +1527,15 @@ function initPage(page, state, mainContent, mainUrl) {
 			if (url) {
 				window.open(url, '_blank');
 			} else {
-				notify('error', _('Dashboard was not found on sing-box listening ports'));
+				notify('error', _('Dashboard was not found. Open browser console for detailed diagnostics.'));
 			}
+		} catch (e) {
+			console.error('[Dashboard discovery] unexpected error:', e);
+			notify('error', _('Dashboard discovery failed: ') + e.message);
 		} finally {
 			dashBtn.disabled = false;
 		}
 	};
-
 	// Mode badge click handler
 	const modeBadge = page.querySelector('#sbox-mode-badge');
 	if (modeBadge) {
