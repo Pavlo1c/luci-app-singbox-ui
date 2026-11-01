@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-singbox-ui
-PKG_VERSION:=2.4.0
+PKG_VERSION:=2.4.1
 # Keep the package version identical to PKG_VERSION in opkg/apk metadata.
 PKG_RELEASE:=
 
