@@ -982,7 +982,7 @@ function buildPageHtml(state) {
     <div class="sbox-actions">
       ${cbtn('apply',    'format',   _('Format'))}
       ${cbtn('positive', 'save',     _('Save'))}
-      <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
+      <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}">${_('Search')}</button>
       <button type="button" class="cbi-button cbi-button-apply"
         data-config-action="setAsMain" id="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
       ${cbtn('negative', 'clear', _('Clear All'))}
@@ -1445,14 +1445,9 @@ function initPage(page, state, mainContent, mainUrl) {
 	const dashBtn = page.querySelector('#sbox-header-dash');
 	if (dashBtn) dashBtn.onclick = async () => {
 		const host = window.location.hostname;
-		const report = message => {
-			console.info('[Dashboard discovery]', message);
-			notify('info', message);
-		};
 		const findPorts = [
 			'pids="$(pidof sing-box 2>/dev/null)"',
-			'[ -n "$pids" ] || { echo "sing-box process not found" >&2; exit 1; }',
-			'echo "PIDs: $pids" >&2',
+			'[ -n "$pids" ] || exit 1',
 			'inodes=""',
 			'for pid in $pids; do',
 			'  for fd in /proc/"$pid"/fd/*; do',
@@ -1462,7 +1457,7 @@ function initPage(page, state, mainContent, mainUrl) {
 			'    esac',
 			'  done',
 		'done',
-		'[ -n "$inodes" ] || { echo "No sockets found for sing-box" >&2; exit 2; }',
+		'[ -n "$inodes" ] || exit 2',
 		'awk -v sockets="$inodes" \'',
 		'  function hexdec(s, i, n, c) {',
 		'    n=0; s=toupper(s);',
@@ -1480,59 +1475,34 @@ function initPage(page, state, mainContent, mainUrl) {
 
 		dashBtn.disabled = true;
 		try {
-			report(_('Dashboard: searching for sing-box process…'));
 			const scan = await fs.exec('/bin/sh', ['-c', findPorts]);
-			const output = String(scan?.stdout || '').trim();
-			const errors = String(scan?.stderr || '').trim();
-			const ports = output.split(/\s+/).filter(p => /^\d+$/.test(p));
-			console.info('[Dashboard discovery] socket scan:', { code: scan?.code, stdout: output, stderr: errors });
-
-			if (scan?.code !== 0 && !ports.length) {
-				notify('error', _('Dashboard scan failed: ') + (errors || _('no listening sockets found')));
-				return;
-			}
+			const ports = String(scan?.stdout || '').trim().split(/\s+/).filter(p => /^\d+$/.test(p));
 			if (!ports.length) {
-				notify('error', _('sing-box is running, but no TCP listening ports were detected'));
+				notify('error', _('No TCP listening ports found for sing-box'));
 				return;
 			}
 
-			report(_('Dashboard: found listening ports: ') + ports.join(', '));
 			let url = null;
-
 			for (const protocol of ['http', 'https']) {
 				for (const port of ports) {
 					const candidate = `${protocol}://${host}:${port}/ui/`;
-					report(_('Checking ') + candidate);
 					try {
 						const result = await fs.exec('/usr/bin/curl', [
 							'-k', '-sS', '-o', '/dev/null', '-w', '%{http_code}',
 							'--connect-timeout', '2', '--max-time', '3', candidate,
 						]);
-						const status = String(result?.stdout || '').trim();
-						console.info('[Dashboard discovery] probe:', candidate, {
-							code: result?.code, httpStatus: status, stderr: result?.stderr,
-						});
-						if (result?.code === 0 && status === '200') {
+						if (result?.code === 0 && String(result.stdout || '').trim() === '200') {
 							url = candidate;
-							report(_('Dashboard found (HTTP 200): ') + url);
 							break;
 						}
-						report(candidate + _(' — HTTP status: ') + (status || _('connection failed')));
-					} catch (e) {
-						console.warn('[Dashboard discovery] probe error:', candidate, e);
-						report(candidate + _(' — connection error: ') + e.message);
-					}
+					} catch (_) {}
 				}
 				if (url) break;
 			}
 
-			if (url) {
-				window.open(url, '_blank');
-			} else {
-				notify('error', _('Dashboard was not found. Open browser console for detailed diagnostics.'));
-			}
+			if (url) window.open(url, '_blank');
+			else notify('error', _('Dashboard was not found on sing-box listening ports'));
 		} catch (e) {
-			console.error('[Dashboard discovery] unexpected error:', e);
 			notify('error', _('Dashboard discovery failed: ') + e.message);
 		} finally {
 			dashBtn.disabled = false;
