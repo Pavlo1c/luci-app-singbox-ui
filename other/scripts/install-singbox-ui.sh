@@ -101,16 +101,14 @@ init_language() {
             MSG_INSTALL_UI="Начало установки singbox-ui..."
             MSG_CHOOSE_VERSION="Выберите версию singbox-ui для установки:"
             MSG_OPTION_1="1) Latest (~150 Кб)"
-            MSG_OPTION_2="2) Lite версия (~6 Кб) (Не поддерживается, старая версия, без новых фич)"
-            MSG_OPTION_3="3) Pre-release (бета, возможны баги)"
-            MSG_OPTION_4="4) Runner сборка из Pull Request (тестовая)"
+            MSG_OPTION_2="2) Pre-release (ветка develop, тестовая сборка)"
             MSG_INVALID_CHOICE="Неверный выбор"
             MSG_INSTALL_COMPLETE="Установка завершена"
             MSG_CLEANUP_LIB="Очистка библиотек..."
             MSG_CLEANUP="Очистка файлов..."
             MSG_CLEANUP_DONE="Файлы удалены!"
             MSG_SELECT_RUNNER="Выберите Runner сборку для установки:"
-            MSG_NO_PRE_RELEASE="Не удалось получить pre-release, используем latest."
+            MSG_NO_PRE_RELEASE="Не удалось найти сборку ветки develop. Установка отменена."
             MSG_RUNNER_INDEX_UNAVAILABLE="Не удалось загрузить список runner сборок (index.txt)."
             MSG_RUNNER_LIST_EMPTY="Список runner сборок пуст."
             MSG_INSTALL_LATEST="Устанавливается последняя доступная сборка (latest)..."
@@ -160,14 +158,12 @@ init_language() {
             MSG_INSTALL_UI="Starting singbox-ui installation..."
             MSG_CHOOSE_VERSION="Select singbox-ui version to install:"
             MSG_OPTION_1="1) Latest (~150 KB)"
-            MSG_OPTION_2="2) Lite version (~6 KB) (Not supported, old version, without new features)"
-            MSG_OPTION_3="3) Pre-release (beta, may have bugs)"
-            MSG_OPTION_4="4) Runner build from Pull Request (testing)"
+            MSG_OPTION_2="2) Pre-release (develop branch, testing build)"
             MSG_INSTALL_COMPLETE="Installation complete"
             MSG_CLEANUP="Cleaning up files..."
             MSG_CLEANUP_DONE="Files removed!"
             MSG_SELECT_RUNNER="Select Runner build to install:"
-            MSG_NO_PRE_RELEASE="Failed to fetch pre-release, using latest."
+            MSG_NO_PRE_RELEASE="Could not find a develop build. Installation cancelled."
             MSG_RUNNER_INDEX_UNAVAILABLE="Failed to load runner build list (index.txt)."
             MSG_RUNNER_LIST_EMPTY="Runner build list is empty."
             MSG_INVALID_CHOICE="Invalid choice"
@@ -294,16 +290,12 @@ network_check() {
 
 # Выбор версии для установки / Version selection
 choose_install_version() {
-    # Ссылки на файлы для каждой версии (ipk для opkg, apk для OpenWrt 25) / URLs per version
     local url_latest="https://github.com/Pavlo1c/luci-app-singbox-ui/releases/latest/download/luci-app-singbox-ui.${PKG_EXT}"
-    local url_lite="https://github.com/Pavlo1c/luci-app-singbox-ui/releases/download/v1.2.1/luci-app-singbox-ui.${PKG_EXT}"
 
     while true; do
         show_message "$MSG_CHOOSE_VERSION"
         show_message "$MSG_OPTION_1"
         show_message "$MSG_OPTION_2"
-        show_message "$MSG_OPTION_3"
-        show_message "$MSG_OPTION_4"
         read_input "$MSG_YOUR_CHOICE" VERSION_CHOICE
 
         case "$VERSION_CHOICE" in
@@ -312,87 +304,17 @@ choose_install_version() {
             break
             ;;
         2)
-            DOWNLOAD_URL="$url_lite"
-            break
-            ;;
-        3)
-            # Получаем ссылку на последнюю pre-release сборку для ветки (предпочитаем .apk/.ipk по платформе)
-            DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases | \
-            awk -v branch="$BRANCH" -v ext="$PKG_EXT" '
-                /"prerelease": true/ { prerelease=1 }
-                /"target_commitish":/ {
-                    tc=$0
-                    gsub(/.*"target_commitish": *"|"[,].*/, "", tc)
-                    if (prerelease && tc != branch) prerelease=0
-                }
-                prerelease && /"browser_download_url":/ && index($0, "luci-app-singbox-ui." ext) {
-                    url=$0
-                    gsub(/.*"browser_download_url": *"|"[,].*/, "", url)
-                    gsub(/"$/, "", url)
-                    print url
-                    exit
-                }
-            ')
-
-            if [ -z "$DOWNLOAD_URL" ]; then
-                # fallback: ищем любой pre-release по расширению / any prerelease by extension
-                DOWNLOAD_URL=$(curl -s https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases | \
-                grep -A 20 '"prerelease": true' | \
-                grep "browser_download_url.*luci-app-singbox-ui\.${PKG_EXT}" | \
-                head -n 1 | \
-                sed -E 's/.*"browser_download_url": *"([^"]+)".*/\1/' | \
-                sed -E 's/"$//')
-            fi
+            # Select the newest pre-release built from the permanent develop branch.
+            DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases" | \
+                jq -r --arg asset "luci-app-singbox-ui.${PKG_EXT}" '
+                    [.[] | select(.prerelease == true and .target_commitish == "develop")
+                     | .assets[] | select(.name == $asset) | .browser_download_url][0] // empty
+                ')
 
             if [ -z "$DOWNLOAD_URL" ]; then
                 show_error "$MSG_NO_PRE_RELEASE"
-                DOWNLOAD_URL="$url_latest"
+                exit 1
             fi
-            break
-            ;;
-        4)
-            local runner_base_url="https://raw.githubusercontent.com/Pavlo1c/luci-app-singbox-ui/${BRANCH}/artifacts/${PKG_EXT}"
-            local index_url="$runner_base_url/index.txt"
-
-            show_progress "$MSG_SELECT_RUNNER"
-
-            # Получаем список runner сборок (ipk или apk по платформе) / Get list of runner builds
-            local http_code=$(curl -s -o /tmp/index.txt -w "%{http_code}" "$index_url")
-            if [ "$http_code" != "200" ]; then
-                show_error "$MSG_RUNNER_INDEX_UNAVAILABLE"
-                show_progress "$MSG_INSTALL_LATEST"
-                DOWNLOAD_URL="$url_latest"
-                break
-            fi
-
-            local runner_files
-            runner_files=$(cat /tmp/index.txt)
-
-            if [ -z "$runner_files" ]; then
-                show_error "$MSG_RUNNER_LIST_EMPTY"
-                show_progress "$MSG_INSTALL_LATEST"
-                DOWNLOAD_URL="$url_latest"
-                break
-            fi
-
-            local i=1
-            for file in $runner_files; do
-                show_message "  [$i] $file"
-                eval RUNNER_$i="'$file'"
-                i=$((i+1))
-            done
-
-            while true; do
-                read_input "$MSG_YOUR_CHOICE" CHOICE
-                eval selected_runner_file=\$RUNNER_"$CHOICE"
-
-                if [ -n "$selected_runner_file" ] && [ "$CHOICE" -ge 1 ] && [ "$CHOICE" -le $((i-1)) ] 2>/dev/null; then
-                    DOWNLOAD_URL="$runner_base_url/$selected_runner_file"
-                    break
-                else
-                    show_error "$MSG_INVALID_CHOICE. $MSG_REPEAT_INPUT"
-                fi
-            done
             break
             ;;
         *)
