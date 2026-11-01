@@ -983,7 +983,7 @@ function buildPageHtml(state) {
       ${cbtn('positive', 'save',     _('Save'))}
       <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
       <button type="button" class="cbi-button cbi-button-apply"
-        data-config-action="setAsMain" class="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
+        data-config-action="setAsMain" style="display:none">${_('Set as Main')}</button>
       ${cbtn('negative', 'clear', _('Clear All'))}
     </div>
     <div id="sbox-ace" class="sbox-editor"></div>
@@ -995,7 +995,7 @@ function buildPageHtml(state) {
         data-config-action="setAsMain" class="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
       ${cbtn('negative', 'clear', _('Clear All'))}
     </div>
-    <div id="sbox-ace" class="sbox-editor"></div>
+
   </div>
   <div id="sbox-tab-logs" style="display:none">
     <div class="sbox-log-toolbar">
