@@ -3,21 +3,49 @@
 # Source this after ui.sh. Sets PKG_IS_APK (0|1) and PKG_EXT (ipk|apk).
 
 detect_pkg_manager() {
+    local release=""
+    local prefer_apk=0
+
+    # Prefer the manager used by the installed OpenWrt release, then fall back.
+    if [ -r /etc/openwrt_release ]; then
+        release="$(. /etc/openwrt_release; printf '%s' "${DISTRIB_RELEASE:-}")"
+    fi
+
+    case "$release" in
+        25.12*|26.*|27.*|28.*|29.*)
+            prefer_apk=1
+            ;;
+    esac
+
     PKG_IS_APK=0
-    command -v apk >/dev/null 2>&1 && PKG_IS_APK=1
+    if [ "$prefer_apk" -eq 1 ]; then
+        if command -v apk >/dev/null 2>&1; then
+            PKG_IS_APK=1
+        elif command -v opkg >/dev/null 2>&1; then
+            PKG_IS_APK=0
+        else
+            show_message "No package manager (apk/opkg) found." 2>/dev/null || true
+            return 1
+        fi
+    else
+        if command -v opkg >/dev/null 2>&1; then
+            PKG_IS_APK=0
+        elif command -v apk >/dev/null 2>&1; then
+            PKG_IS_APK=1
+        else
+            show_message "No package manager (opkg/apk) found." 2>/dev/null || true
+            return 1
+        fi
+    fi
 
     if [ "$PKG_IS_APK" -eq 1 ]; then
         PKG_EXT="apk"
-        PKG_MODE_LABEL="apk (.apk) — OpenWrt 25"
-    elif command -v opkg >/dev/null 2>&1; then
-        PKG_EXT="ipk"
-        PKG_MODE_LABEL="opkg (.ipk) — OpenWrt 23/24"
+        PKG_MODE_LABEL="apk (.apk)"
     else
-        show_message "No package manager (opkg/apk) found." 2>/dev/null || true
-        return 1
+        PKG_EXT="ipk"
+        PKG_MODE_LABEL="opkg (.ipk)"
     fi
 
-    # Показать режим наглядно (show_message из ui.sh, подключается до pkg.sh)
     [ -n "$PKG_MODE_LABEL" ] && show_message "Package manager: $PKG_MODE_LABEL" 2>/dev/null || true
 }
 
