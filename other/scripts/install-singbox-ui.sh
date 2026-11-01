@@ -349,6 +349,9 @@ install_singbox_ui() {
     chmod 0755 "$pkg_file"
     pkg_list_update
     pkg_install_file "$pkg_file"
+    # Refresh LuCI's cached menu so newly installed/updated menu.d entries are registered.
+    rm -f /tmp/luci-indexcache
+    /etc/init.d/rpcd reload 2>/dev/null || /etc/init.d/rpcd restart
     /etc/init.d/uhttpd restart
     show_success "$MSG_INSTALL_COMPLETE"
 }
