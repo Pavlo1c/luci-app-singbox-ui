@@ -1,0 +1,104 @@
+name: Build luci-app-singbox-ui from develop
+run-name: Build develop pre-release ${{ github.run_number }}.${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.pkg_type }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg_type: [ipk, apk]
+
+    steps:
+      - name: Checkout develop source
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 1
+
+      - name: Set development package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' luci-app-singbox-ui/Makefile)"
+          DEV_VERSION="${BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          sed -i "s/^PKG_VERSION:=.*$/PKG_VERSION:=${DEV_VERSION}/" luci-app-singbox-ui/Makefile
+          echo "PACKAGE_VERSION=${DEV_VERSION}" >> "$GITHUB_ENV"
+          grep '^PKG_VERSION:=' luci-app-singbox-ui/Makefile
+
+      - name: Build Docker image (${{ matrix.pkg_type }})
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: .
+          file: Dockerfile-${{ matrix.pkg_type }}
+          tags: singbox-ui-${{ matrix.pkg_type }}:develop
+
+      - name: Create Docker container
+        run: docker create --name singbox-ui-${{ matrix.pkg_type }} singbox-ui-${{ matrix.pkg_type }}:develop
+
+      - name: Copy built package from Docker container
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ./sdk-output ./pkg-out
+          docker cp singbox-ui-${{ matrix.pkg_type }}:/builder/bin/packages/x86_64/luci/. ./sdk-output/
+          shopt -s nullglob
+          packages=(./sdk-output/luci-app-singbox-ui*.\${{ matrix.pkg_type }})
+          if [ "${#packages[@]}" -ne 1 ]; then
+            echo "Expected exactly one luci-app-singbox-ui .${{ matrix.pkg_type }} package; found ${#packages[@]}" >&2
+            ls -la ./sdk-output/
+            exit 1
+          fi
+          cp "${packages[0]}" "./pkg-out/luci-app-singbox-ui.${{ matrix.pkg_type }}"
+
+      - name: Remove Docker container
+        if: always()
+        run: docker rm -f singbox-ui-${{ matrix.pkg_type }} || true
+
+      - name: Upload built package
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: pkg-${{ matrix.pkg_type }}
+          path: pkg-out/*
+          if-no-files-found: error
+
+  prerelease:
+    name: Publish develop pre-release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download IPK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pkg-ipk
+          path: release/
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pkg-apk
+          path: release/
+
+      - name: Create GitHub pre-release
+        uses: softprops/action-gh-release@v2.4.0
+        with:
+          tag_name: v${{ github.event.repository }}-dev.${{ github.run_number }}.${{ github.run_attempt }}
+          target_commitish: develop
+          name: singbox-ui develop ${{ github.run_number }}.${{ github.run_attempt }}
+          files: |
+            release/*.ipk
+            release/*.apk
+          draft: false
+          prerelease: true
+          make_latest: false
