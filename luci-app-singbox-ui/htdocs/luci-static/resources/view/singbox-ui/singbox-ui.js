@@ -31,16 +31,6 @@ const isValidUrl = url => {
 };
 
 /**
- * Extract port from "external_controller" field in a sing-box JSON config.
- * Handles formats like "0.0.0.0:9090", "127.0.0.1:9090", ":9090".
- * Returns port string or null if not found.
- */
-const parseDashboardPort = content => {
-	const m = (content || '').match(/"external_controller"\s*:\s*"[^"]*:(\d+)"/);
-	return m ? m[1] : null;
-};
-
-/**
  * Show a LuCI notification.
  */
 const NOTIFY_TIMEOUT = { info: 6000, error: 10000 };
@@ -964,7 +954,7 @@ function buildPageHtml(state) {
 		proxyMode === 'conflict' ? '\u26A0 ' + _('fix: tproxy + tun conflict') :
 		proxyMode + ' ' + _('mode')
 	}</span>
-  <button type="button" id="sbox-header-dash" class="cbi-button cbi-button-apply sbox-header-dash"${(state.singboxRunning && state.dashboardPort) ? '' : ' style="display:none"'}>${_('Dashboard')}</button>
+  <button type="button" id="sbox-header-dash" class="cbi-button cbi-button-apply sbox-header-dash"${state.singboxRunning ? '' : ' style="display:none"'}>${_('Dashboard')}</button>
 </div>
 <div class="sbox-card" id="sbox-ctrl-svc">
   <div class="sbox-card-tabs">
@@ -1041,7 +1031,7 @@ function initPage(page, state, mainContent, mainUrl) {
 
 	function updateDashBtn() {
 		const b = page.querySelector('#sbox-header-dash');
-		if (b) b.style.display = (state.singboxRunning && state.dashboardPort) ? '' : 'none';
+		if (b) b.style.display = state.singboxRunning ? '' : 'none';
 	}
 
 	function bindControlCard() {
@@ -1273,7 +1263,6 @@ function initPage(page, state, mainContent, mainUrl) {
 							notify('info', _('Sing-Box reloaded'));
 							state.isInitialConfigValid = await isValidConfig(newContent);
 							state.mainConfigHasUrl = true;
-							state.dashboardPort = parseDashboardPort(newContent);
 							await refreshControlCard();
 							await refreshServiceCard();
 						}
@@ -1301,7 +1290,6 @@ function initPage(page, state, mainContent, mainUrl) {
 						await execService('sing-box', 'reload');
 						notify('info', _('Sing-Box reloaded'));
 						state.isInitialConfigValid = await isValidConfig(newContent);
-						state.dashboardPort = parseDashboardPort(newContent);
 						await refreshControlCard();
 					}
 				} catch (e) {
@@ -1365,7 +1353,6 @@ function initPage(page, state, mainContent, mainUrl) {
 						await execService('sing-box', 'reload');
 						notify('info', _('Sing-Box reloaded'));
 						state.isInitialConfigValid = true;
-						state.dashboardPort = parseDashboardPort(val);
 						await refreshControlCard();
 					}
 				} catch (e) { notify('error', _('Save failed: ') + e.message); }
@@ -1457,29 +1444,60 @@ function initPage(page, state, mainContent, mainUrl) {
 
 	const dashBtn = page.querySelector('#sbox-header-dash');
 	if (dashBtn) dashBtn.onclick = async () => {
-		if (!state.dashboardPort) return;
-
 		const host = window.location.hostname;
-		const port = state.dashboardPort;
-		const probe = async protocol => {
-			const url = `${protocol}://${host}:${port}/ui/`;
-			try {
-				const r = await fs.exec('/bin/uclient-fetch', [
-					'-q', '--no-check-certificate', '--timeout=3', '-O', '/dev/null', url,
-				]);
-				return r?.code === 0 ? url : null;
-			} catch (_) {
-				return null;
-			}
-		};
+		const findPorts = [
+			'set -f',
+			'pids="$(pidof sing-box 2>/dev/null)"',
+			'[ -n "$pids" ] || exit 1',
+			'inodes=""',
+			'for pid in $pids; do',
+			'  for fd in /proc/"$pid"/fd/*; do',
+			'    link="$(readlink "$fd" 2>/dev/null)"',
+			'    case "$link" in',
+			'      socket:\\[*\\]) inode="${link#socket:[}"; inode="${inode%]}"; inodes="$inodes $inode" ;;',
+			'    esac',
+			'  done',
+		'done',
+		'[ -n "$inodes" ] || exit 1',
+		'awk -v sockets="$inodes" \'',
+		'  function hexdec(s, i, n, c) {',
+		'    n=0; s=toupper(s);',
+		'    for (i=1; i<=length(s); i++) {',
+		'      c=index("0123456789ABCDEF", substr(s,i,1))-1;',
+		'      if (c<0) return 0;',
+		'      n=n*16+c;',
+		'    }',
+		'    return n;',
+		'  }',
+		'  BEGIN { count=split(sockets, a, " "); for (i=1; i<=count; i++) if (a[i] != "") owned[a[i]]=1 }',
+		'  NR>1 && $4=="0A" && ($10 in owned) { split($2, addr, ":"); p=hexdec(addr[2]); if (p>0) print p }',
+		'\' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -n -u',
+		].join('\\n');
 
 		dashBtn.disabled = true;
 		try {
-			const url = await probe('http') || await probe('https');
+			const scan = await fs.exec('/bin/sh', ['-c', findPorts]);
+			const ports = String(scan?.stdout || '').trim().split(/\\s+/).filter(p => /^\\d+$/.test(p));
+			let url = null;
+
+			// Probe HTTP on every sing-box listening port first, then HTTPS.
+			for (const protocol of ['http', 'https']) {
+				for (const port of ports) {
+					const candidate = `${protocol}://${host}:${port}/ui/`;
+					try {
+						const result = await fs.exec('/bin/uclient-fetch', [
+							'-q', '--no-check-certificate', '--timeout=3', '-O', '/dev/null', candidate,
+						]);
+						if (result?.code === 0) { url = candidate; break; }
+					} catch (_) {}
+				}
+				if (url) break;
+			}
+
 			if (url) {
 				window.open(url, '_blank');
 			} else {
-				notify('error', _('Dashboard is not responding on HTTP or HTTPS'));
+				notify('error', _('Dashboard was not found on sing-box listening ports'));
 			}
 		} finally {
 			dashBtn.disabled = false;
@@ -1705,7 +1723,6 @@ return view.extend({
 			tproxyActive,
 			tunActive,
 			mainConfigHasUrl:                 isValidUrl(mainUrl),
-			dashboardPort:                    parseDashboardPort(mainContent),
 			healthAutoupdaterServiceTempFlag,
 			autoupdaterServiceTempFlag,
 			autoupdaterEnabled,
