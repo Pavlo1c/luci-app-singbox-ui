@@ -22,7 +22,8 @@
                 "/sbin/uci": ["exec"],
                 "/tmp/*": ["read"],
                 "/sys/class/net/*": ["read"],
-                "/sbin/logread": ["exec"]
+                "/sbin/logread": ["exec"],
+                "/usr/bin/curl": ["exec"]
             },
             "uci": ["singbox-ui"]
         },
