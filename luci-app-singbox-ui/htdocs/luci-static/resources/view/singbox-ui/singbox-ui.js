@@ -1471,12 +1471,12 @@ function initPage(page, state, mainContent, mainUrl) {
 		'  BEGIN { count=split(sockets, a, " "); for (i=1; i<=count; i++) if (a[i] != "") owned[a[i]]=1 }',
 		'  NR>1 && $4=="0A" && ($10 in owned) { split($2, addr, ":"); p=hexdec(addr[2]); if (p>0) print p }',
 		'\' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -n -u',
-		].join('\\n');
+		].join('\n');
 
 		dashBtn.disabled = true;
 		try {
 			const scan = await fs.exec('/bin/sh', ['-c', findPorts]);
-			const ports = String(scan?.stdout || '').trim().split(/\\s+/).filter(p => /^\\d+$/.test(p));
+			const ports = String(scan?.stdout || '').trim().split(/\s+/).filter(p => /^\d+$/.test(p));
 			let url = null;
 
 			// Probe HTTP on every sing-box listening port first, then HTTPS.
