@@ -1310,16 +1310,14 @@ function initPage(page, state, mainContent, mainUrl) {
 		search() {
 			const ed = window.singboxEditor;
 			if (!ed) return notify('error', _('Editor not ready'));
-			ed.focus();
 			try {
-				ace.require(['ace/ext/searchbox'], searchbox => {
-					if (searchbox && typeof searchbox.Search === 'function') {
-						searchbox.Search(ed);
-					} else {
-						console.error('[singbox-ui] Ace searchbox module has no Search export', searchbox);
-						notify('error', _('Search extension is unavailable'));
-					}
-				});
+				const searchModule = ace.require('ace/ext/searchbox');
+				const SearchBox = searchModule && searchModule.SearchBox;
+				if (typeof SearchBox !== 'function')
+					throw new Error('Ace SearchBox constructor is unavailable');
+				const box = ed.searchBox || new SearchBox(ed);
+				box.show(ed.getSelectedText() || '');
+				ed.focus();
 			} catch (e) {
 				console.error('[singbox-ui] Ace search error:', e);
 				notify('error', _('Search panel could not be opened: ') + e.message);
