@@ -305,10 +305,22 @@ choose_install_version() {
             ;;
         2)
             # Select the newest pre-release built from the permanent develop branch.
-            DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases" | \
+            DOWNLOAD_URL=$(curl -fsSL "https://api.github.com/repos/Pavlo1c/luci-app-singbox-ui/releases?per_page=100" | \
                 jq -r --arg asset "luci-app-singbox-ui.${PKG_EXT}" '
-                    [.[] | select(.prerelease == true and .target_commitish == "develop")
-                     | .assets[] | select(.name == $asset) | .browser_download_url][0] // empty
+                    [
+                        .[]
+                        | select(.prerelease == true and .target_commitish == "develop")
+                        | select(.tag_name | test("^develop-[0-9]+-[0-9]+$"))
+                        | {
+                            run:   (.tag_name | capture("^develop-(?<run>[0-9]+)-(?<attempt>[0-9]+)$") | .run | tonumber),
+                            attempt: (.tag_name | capture("^develop-(?<run>[0-9]+)-(?<attempt>[0-9]+)$") | .attempt | tonumber),
+                            url: ([.assets[] | select(.name == $asset) | .browser_download_url][0] // empty)
+                        }
+                        | select(.url != "")
+                    ]
+                    | sort_by(.run, .attempt)
+                    | last
+                    | .url // empty
                 ')
 
             if [ -z "$DOWNLOAD_URL" ]; then
