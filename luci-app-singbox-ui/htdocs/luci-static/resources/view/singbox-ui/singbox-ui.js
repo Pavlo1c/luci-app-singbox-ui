@@ -31,16 +31,6 @@ const isValidUrl = url => {
 };
 
 /**
- * Extract port from "external_controller" field in a sing-box JSON config.
- * Handles formats like "0.0.0.0:9090", "127.0.0.1:9090", ":9090".
- * Returns port string or null if not found.
- */
-const parseDashboardPort = content => {
-	const m = (content || '').match(/"external_controller"\s*:\s*"[^"]*:(\d+)"/);
-	return m ? m[1] : null;
-};
-
-/**
  * Show a LuCI notification.
  */
 const NOTIFY_TIMEOUT = { info: 6000, error: 10000 };
@@ -564,6 +554,7 @@ function loadScript(src) {
 async function initAceEditor(el, content) {
 	await loadScript(ACE_BASE + 'ace.js');
 	await loadScript(ACE_BASE + 'ext-language_tools.js');
+	await loadScript(ACE_BASE + 'ext-searchbox.js');
 	ace.config.set('basePath',   ACE_BASE);
 	ace.config.set('workerPath', ACE_BASE);
 	const ed = ace.edit(el);
@@ -963,7 +954,7 @@ function buildPageHtml(state) {
 		proxyMode === 'conflict' ? '\u26A0 ' + _('fix: tproxy + tun conflict') :
 		proxyMode + ' ' + _('mode')
 	}</span>
-  <button type="button" id="sbox-header-dash" class="cbi-button cbi-button-apply sbox-header-dash"${(state.singboxRunning && state.dashboardPort) ? '' : ' style="display:none"'}>${_('Dashboard')}</button>
+  <button type="button" id="sbox-header-dash" class="cbi-button cbi-button-apply sbox-header-dash"${state.singboxRunning ? '' : ' style="display:none"'}>${_('Dashboard')}</button>
 </div>
 <div class="sbox-card" id="sbox-ctrl-svc">
   <div class="sbox-card-tabs">
@@ -987,14 +978,24 @@ function buildPageHtml(state) {
       ${cbtn('positive', 'saveUrl', _('Save URL'))}
       ${cbtn('reload',   'update',  _('Update'))}
     </div>
+    <div class="sbox-actions">
+      ${cbtn('apply',    'format',   _('Format'))}
+      ${cbtn('positive', 'save',     _('Save'))}
+      <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
+      <button type="button" class="cbi-button cbi-button-apply"
+        data-config-action="setAsMain" style="display:none">${_('Set as Main')}</button>
+      ${cbtn('negative', 'clear', _('Clear All'))}
+    </div>
     <div id="sbox-ace" class="sbox-editor"></div>
     <div class="sbox-actions">
       ${cbtn('apply',    'format',   _('Format'))}
       ${cbtn('positive', 'save',     _('Save'))}
+      <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
       <button type="button" class="cbi-button cbi-button-apply"
-        data-config-action="setAsMain" id="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
+        data-config-action="setAsMain" class="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
       ${cbtn('negative', 'clear', _('Clear All'))}
     </div>
+
   </div>
   <div id="sbox-tab-logs" style="display:none">
     <div class="sbox-log-toolbar">
@@ -1039,7 +1040,7 @@ function initPage(page, state, mainContent, mainUrl) {
 
 	function updateDashBtn() {
 		const b = page.querySelector('#sbox-header-dash');
-		if (b) b.style.display = (state.singboxRunning && state.dashboardPort) ? '' : 'none';
+		if (b) b.style.display = state.singboxRunning ? '' : 'none';
 	}
 
 	function bindControlCard() {
@@ -1240,7 +1241,7 @@ function initPage(page, state, mainContent, mainUrl) {
 
 	const urlEl      = page.querySelector('#sbox-url');
 	const selectEl   = page.querySelector('#sbox-config-select');
-	const setMainBtn = page.querySelector('#sbox-set-main-btn');
+	const setMainBtns = page.querySelectorAll('[data-config-action="setAsMain"]');
 
 	if (urlEl) urlEl.value = mainUrl || '';
 
@@ -1271,7 +1272,6 @@ function initPage(page, state, mainContent, mainUrl) {
 							notify('info', _('Sing-Box reloaded'));
 							state.isInitialConfigValid = await isValidConfig(newContent);
 							state.mainConfigHasUrl = true;
-							state.dashboardPort = parseDashboardPort(newContent);
 							await refreshControlCard();
 							await refreshServiceCard();
 						}
@@ -1299,13 +1299,29 @@ function initPage(page, state, mainContent, mainUrl) {
 						await execService('sing-box', 'reload');
 						notify('info', _('Sing-Box reloaded'));
 						state.isInitialConfigValid = await isValidConfig(newContent);
-						state.dashboardPort = parseDashboardPort(newContent);
 						await refreshControlCard();
 					}
 				} catch (e) {
 					notify('error', _('Update failed: ') + e.message);
 				}
 			});
+		},
+
+		search() {
+			const ed = window.singboxEditor;
+			if (!ed) return notify('error', _('Editor not ready'));
+			try {
+				const searchModule = ace.require('ace/ext/searchbox');
+				const SearchBox = searchModule && searchModule.SearchBox;
+				if (typeof SearchBox !== 'function')
+					throw new Error('Ace SearchBox constructor is unavailable');
+				const box = ed.searchBox || new SearchBox(ed);
+				box.show(ed.getSelectedText() || '');
+				ed.focus();
+			} catch (e) {
+				console.error('[singbox-ui] Ace search error:', e);
+				notify('error', _('Search panel could not be opened: ') + e.message);
+			}
 		},
 
 		format(b) {
@@ -1357,7 +1373,6 @@ function initPage(page, state, mainContent, mainUrl) {
 						await execService('sing-box', 'reload');
 						notify('info', _('Sing-Box reloaded'));
 						state.isInitialConfigValid = true;
-						state.dashboardPort = parseDashboardPort(val);
 						await refreshControlCard();
 					}
 				} catch (e) { notify('error', _('Save failed: ') + e.message); }
@@ -1438,7 +1453,7 @@ function initPage(page, state, mainContent, mainUrl) {
 			const ed = window.singboxEditor;
 			if (ed) { ed.setValue(content || '', -1); ed.clearSelection(); }
 			if (urlEl)      urlEl.value = url || '';
-			if (setMainBtn) setMainBtn.style.display = cfg.name === 'config.json' ? 'none' : 'inline-block';
+			setMainBtns.forEach(btn => { btn.style.display = cfg.name === 'config.json' ? 'none' : 'inline-block'; });
 		});
 	}
 
@@ -1449,35 +1464,70 @@ function initPage(page, state, mainContent, mainUrl) {
 
 	const dashBtn = page.querySelector('#sbox-header-dash');
 	if (dashBtn) dashBtn.onclick = async () => {
-		if (!state.dashboardPort) return;
-
 		const host = window.location.hostname;
-		const port = state.dashboardPort;
-		const probe = async protocol => {
-			const url = `${protocol}://${host}:${port}/ui/`;
-			try {
-				const r = await fs.exec('/bin/uclient-fetch', [
-					'-q', '--no-check-certificate', '--timeout=3', '-O', '/dev/null', url,
-				]);
-				return r?.code === 0 ? url : null;
-			} catch (_) {
-				return null;
-			}
-		};
+		const findPorts = [
+			'pids="$(pidof sing-box 2>/dev/null)"',
+			'[ -n "$pids" ] || exit 1',
+			'inodes=""',
+			'for pid in $pids; do',
+			'  for fd in /proc/"$pid"/fd/*; do',
+			'    link="$(readlink "$fd" 2>/dev/null)"',
+			'    case "$link" in',
+			'      socket:\\[*\\]) inode="${link#socket:[}"; inode="${inode%]}"; inodes="$inodes $inode" ;;',
+			'    esac',
+			'  done',
+		'done',
+		'[ -n "$inodes" ] || exit 2',
+		'awk -v sockets="$inodes" \'',
+		'  function hexdec(s, i, n, c) {',
+		'    n=0; s=toupper(s);',
+		'    for (i=1; i<=length(s); i++) {',
+		'      c=index("0123456789ABCDEF", substr(s,i,1))-1;',
+		'      if (c<0) return 0;',
+		'      n=n*16+c;',
+		'    }',
+		'    return n;',
+		'  }',
+		'  BEGIN { count=split(sockets, a, " "); for (i=1; i<=count; i++) if (a[i] != "") owned[a[i]]=1 }',
+		'  NR>1 && $4=="0A" && ($10 in owned) { split($2, addr, ":"); p=hexdec(addr[2]); if (p>0) print p }',
+		'\' /proc/net/tcp /proc/net/tcp6 2>/dev/null | sort -n -u',
+		].join('\n');
 
 		dashBtn.disabled = true;
 		try {
-			const url = await probe('http') || await probe('https');
-			if (url) {
-				window.open(url, '_blank');
-			} else {
-				notify('error', _('Dashboard is not responding on HTTP or HTTPS'));
+			const scan = await fs.exec('/bin/sh', ['-c', findPorts]);
+			const ports = String(scan?.stdout || '').trim().split(/\s+/).filter(p => /^\d+$/.test(p));
+			if (!ports.length) {
+				notify('error', _('No TCP listening ports found for sing-box'));
+				return;
 			}
+
+			let url = null;
+			for (const protocol of ['http', 'https']) {
+				for (const port of ports) {
+					const candidate = `${protocol}://${host}:${port}/ui/`;
+					try {
+						const result = await fs.exec('/usr/bin/curl', [
+							'-k', '-sS', '-o', '/dev/null', '-w', '%{http_code}',
+							'--connect-timeout', '2', '--max-time', '3', candidate,
+						]);
+						if (result?.code === 0 && String(result.stdout || '').trim() === '200') {
+							url = candidate;
+							break;
+						}
+					} catch (_) {}
+				}
+				if (url) break;
+			}
+
+			if (url) window.open(url, '_blank');
+			else notify('error', _('Dashboard was not found on sing-box listening ports'));
+		} catch (e) {
+			notify('error', _('Dashboard discovery failed: ') + e.message);
 		} finally {
 			dashBtn.disabled = false;
 		}
 	};
-
 	// Mode badge click handler
 	const modeBadge = page.querySelector('#sbox-mode-badge');
 	if (modeBadge) {
@@ -1697,7 +1747,6 @@ return view.extend({
 			tproxyActive,
 			tunActive,
 			mainConfigHasUrl:                 isValidUrl(mainUrl),
-			dashboardPort:                    parseDashboardPort(mainContent),
 			healthAutoupdaterServiceTempFlag,
 			autoupdaterServiceTempFlag,
 			autoupdaterEnabled,
