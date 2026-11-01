@@ -1450,7 +1450,7 @@ function initPage(page, state, mainContent, mainUrl) {
 	const dashBtn = page.querySelector('#sbox-header-dash');
 	if (dashBtn) dashBtn.onclick = () => {
 		if (state.dashboardPort)
-			window.open(`${window.location.protocol}//${window.location.hostname}:${state.dashboardPort}/ui/`, '_blank');
+			window.open(`http://${window.location.hostname}:${state.dashboardPort}/ui/`, '_blank');
 	};
 
 	// Mode badge click handler
