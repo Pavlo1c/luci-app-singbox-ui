@@ -24,20 +24,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set development package version
+      - name: Set development package release
         shell: bash
         run: |
           set -euo pipefail
-          LATEST_TAG="$(git tag --list 'v[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
-          if [[ -z "$LATEST_TAG" ]]; then
-            echo "No stable version tag found" >&2
-            exit 1
-          fi
-          IFS=. read -r MAJOR MINOR PATCH <<< "${LATEST_TAG#v}"
-          NEXT_PATCH=$((PATCH + 1))
-          DEV_VERSION="${MAJOR}.${MINOR}.${NEXT_PATCH}-dev.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
-          sed -i "s/^PKG_VERSION:=.*$/PKG_VERSION:=${DEV_VERSION}/" luci-app-singbox-ui/Makefile
-          grep '^PKG_VERSION:=' luci-app-singbox-ui/Makefile
+          # Keep version syntax valid for both opkg and apk; numeric release differentiates develop builds.
+          sed -i "s/^PKG_RELEASE:=.*$/PKG_RELEASE:=${GITHUB_RUN_NUMBER}/" luci-app-singbox-ui/Makefile
+          grep -E '^PKG_(VERSION|RELEASE):=' luci-app-singbox-ui/Makefile
 
       - name: Build Docker image (${{ matrix.pkg_type }})
         uses: docker/build-push-action@v6.18.0
