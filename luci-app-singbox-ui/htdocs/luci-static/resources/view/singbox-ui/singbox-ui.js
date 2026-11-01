@@ -522,7 +522,7 @@ async function getVersions() {
 	const readPackageVersion = async (manager) => {
 		try {
 			if (manager === 'apk') {
-				const { stdout } = await fs.exec('apk', ['list', '--installed', '-q', 'luci-app-singbox-ui']);
+				const { stdout } = await fs.exec('apk', ['list', '--installed', 'luci-app-singbox-ui']);
 				const m = stdout?.match(/(?:^|\n)luci-app-singbox-ui-([0-9][0-9A-Za-z.+~-]*)(?:\s|$)/);
 				return m ? m[1] : null;
 			}
