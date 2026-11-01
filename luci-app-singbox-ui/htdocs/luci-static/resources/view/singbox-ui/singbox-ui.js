@@ -983,7 +983,16 @@ function buildPageHtml(state) {
       ${cbtn('positive', 'save',     _('Save'))}
       <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
       <button type="button" class="cbi-button cbi-button-apply"
-        data-config-action="setAsMain" id="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
+        data-config-action="setAsMain" class="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
+      ${cbtn('negative', 'clear', _('Clear All'))}
+    </div>
+    <div id="sbox-ace" class="sbox-editor"></div>
+    <div class="sbox-actions">
+      ${cbtn('apply',    'format',   _('Format'))}
+      ${cbtn('positive', 'save',     _('Save'))}
+      <button type="button" class="cbi-button" data-config-action="search" title="${_('Search in config')}" aria-label="${_('Search in config')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></button>
+      <button type="button" class="cbi-button cbi-button-apply"
+        data-config-action="setAsMain" class="sbox-set-main-btn" style="display:none">${_('Set as Main')}</button>
       ${cbtn('negative', 'clear', _('Clear All'))}
     </div>
     <div id="sbox-ace" class="sbox-editor"></div>
@@ -1232,7 +1241,7 @@ function initPage(page, state, mainContent, mainUrl) {
 
 	const urlEl      = page.querySelector('#sbox-url');
 	const selectEl   = page.querySelector('#sbox-config-select');
-	const setMainBtn = page.querySelector('#sbox-set-main-btn');
+	const setMainBtns = page.querySelectorAll('[data-config-action="setAsMain"]');
 
 	if (urlEl) urlEl.value = mainUrl || '';
 
@@ -1433,7 +1442,7 @@ function initPage(page, state, mainContent, mainUrl) {
 			const ed = window.singboxEditor;
 			if (ed) { ed.setValue(content || '', -1); ed.clearSelection(); }
 			if (urlEl)      urlEl.value = url || '';
-			if (setMainBtn) setMainBtn.style.display = cfg.name === 'config.json' ? 'none' : 'inline-block';
+			setMainBtns.forEach(btn => { btn.style.display = cfg.name === 'config.json' ? 'none' : 'inline-block'; });
 		});
 	}
 
