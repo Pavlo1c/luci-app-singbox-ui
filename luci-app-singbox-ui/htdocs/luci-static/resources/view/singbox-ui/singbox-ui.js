@@ -1448,9 +1448,34 @@ function initPage(page, state, mainContent, mainUrl) {
 	bindSettingsCard();
 
 	const dashBtn = page.querySelector('#sbox-header-dash');
-	if (dashBtn) dashBtn.onclick = () => {
-		if (state.dashboardPort)
-			window.open(`http://${window.location.hostname}:${state.dashboardPort}/ui/`, '_blank');
+	if (dashBtn) dashBtn.onclick = async () => {
+		if (!state.dashboardPort) return;
+
+		const host = window.location.hostname;
+		const port = state.dashboardPort;
+		const probe = async protocol => {
+			const url = `${protocol}://${host}:${port}/ui/`;
+			try {
+				const r = await fs.exec('/bin/uclient-fetch', [
+					'-q', '--no-check-certificate', '--timeout=3', '-O', '/dev/null', url,
+				]);
+				return r?.code === 0 ? url : null;
+			} catch (_) {
+				return null;
+			}
+		};
+
+		dashBtn.disabled = true;
+		try {
+			const url = await probe('http') || await probe('https');
+			if (url) {
+				window.open(url, '_blank');
+			} else {
+				notify('error', _('Dashboard is not responding on HTTP or HTTPS'));
+			}
+		} finally {
+			dashBtn.disabled = false;
+		}
 	};
 
 	// Mode badge click handler
